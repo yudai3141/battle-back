@@ -4,10 +4,17 @@ const userRoute = require("./routes/users");
 const authRoute = require("./routes/auth");
 const postRoute = require("./routes/posts");
 const uploadRoute = require("./routes/upload");
+const notificationRoute = require("./routes/notifications"); 
+const battleRoute = require("./routes/battles"); 
 const PORT = 5001; //何故か5000は使えなかった
 const mongoose = require("mongoose");
 const path = require("path");
+const cors = require("cors");
 require("dotenv").config();
+
+
+app.use(express.json());
+app.use(cors()); 
 
 //DB接続
 mongoose.connect(process.env.MONGOURL)
@@ -24,6 +31,8 @@ app.use("/api/users", userRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/posts", postRoute);
 app.use("/api/upload", uploadRoute);
+app.use("/api/notifications", notificationRoute); 
+app.use("/api/battles", battleRoute); 
 
 
 app.get("/", (req,res) => {

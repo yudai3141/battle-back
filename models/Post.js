@@ -1,13 +1,14 @@
 const mongoose = require("mongoose");
 
 const PostSchema = new mongoose.Schema({
+
         userId: {
             type: String,
-            required: true,
+            require: true,
         },
-        desc: {
-            type: String,
-            max: 200,
+
+        desc: { 
+            type: String
         },
         img: {
             type: String,
@@ -15,6 +16,18 @@ const PostSchema = new mongoose.Schema({
         likes: {
             type: Array,
             default: [],
+        },
+        parentPostId: {
+            type: String,
+            default: null,
+        },
+        childPostIds: {  
+            type: [String],
+            default: [],
+        },
+        battleRequested: {
+            type: Boolean,
+            default: false,
         },
     },
     {timestamps: true}

@@ -48,6 +48,7 @@ const UserSchema = new mongoose.Schema({
         type: String,
         max: 50,
     },
+    eloRating: { type: Number, default: 1500 }, // Eloレーティングの初期値
 },
 {timestamps: true}
 );
