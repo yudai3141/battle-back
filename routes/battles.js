@@ -192,7 +192,73 @@ router.post('/:battleId/finish', async (req, res) => {
   }
 });
 
-// Eloレーティングを更新する関数
+// バトル結果を処理するエンドポイント
+router.get('/:battleId/process', async (req, res) => {
+  try {
+    const { battleId } = req.params;
+
+    // バトル情報を取得
+    const battle = await Battle.findById(battleId)
+      .populate('initiatorId', 'username profilePicture')
+      .populate('opponentId', 'username profilePicture')
+      .populate({
+        path: 'rounds',
+        populate: { path: 'speakerId', select: 'username' },
+      });
+
+    // 元の投稿を取得
+    const post = await Post.findById(battle.postId);
+
+    // Pythonスクリプトを実行し、データを渡す
+    const pythonProcess = spawn('python3', ['process_battle.py']);
+
+    // Pythonスクリプトにデータを送信
+    pythonProcess.stdin.write(JSON.stringify({ battle, post }));
+    pythonProcess.stdin.end();
+
+    let pythonOutput = '';
+    pythonProcess.stdout.on('data', (data) => {
+      pythonOutput += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      console.error(`stderr: ${data}`);
+    });
+
+    pythonProcess.on('close', async (code) => {
+      console.log(`Python script exited with code ${code}`);
+
+      // 出力をパース
+      const result = JSON.parse(pythonOutput);
+
+      // 勝者情報がある場合、バトル情報を更新し、Eloレートを更新
+      if (result.winnerId) {
+        battle.winnerId = result.winnerId;
+        battle.isFinished = true;
+        await battle.save();
+
+        // Eloレートを更新
+        await updateEloRating(result.winnerId, result.loserId);
+
+        // 勝者と敗者の情報を取得
+        const winner = await User.findById(result.winnerId);
+        const loser = await User.findById(result.loserId);
+
+        // 結果にプロフィール画像を追加
+        result.winnerProfilePicture = winner.profilePicture;
+        result.loserProfilePicture = loser.profilePicture;
+      }
+
+      // 結果をフロントエンドに返す
+      res.status(200).json(result);
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json(err);
+  }
+});
+
+// Eloレートを更新する関数
 const updateEloRating = async (winnerId, loserId) => {
   const K = 32; // 定数K
 
@@ -211,47 +277,5 @@ const updateEloRating = async (winnerId, loserId) => {
   await loser.save();
 };
 
-// バトル結果を処理するエンドポイント
-router.get('/:battleId/process', async (req, res) => {
-    try {
-      const { battleId } = req.params;
-  
-      // バトル情報を取得
-      const battle = await Battle.findById(battleId)
-        .populate('initiatorId', 'username')
-        .populate('opponentId', 'username')
-        .populate({
-          path: 'rounds',
-          populate: { path: 'speakerId', select: 'username' },
-        });
-  
-      // 元の投稿を取得
-      const post = await Post.findById(battle.postId);
-  
-      // Pythonスクリプトを実行し、データを渡す
-      const pythonProcess = spawn('python3', ['process_battle.py']);
-  
-      // Pythonスクリプトにデータを送信
-      pythonProcess.stdin.write(JSON.stringify({ battle, post }));
-      pythonProcess.stdin.end();
-  
-      let pythonOutput = '';
-      pythonProcess.stdout.on('data', (data) => {
-        pythonOutput += data.toString();
-      });
-  
-      pythonProcess.stderr.on('data', (data) => {
-        console.error(`stderr: ${data}`);
-      });
-  
-      pythonProcess.on('close', (code) => {
-        console.log(`Python script exited with code ${code}`);
-        // 結果をクライアントに返す
-        res.status(200).json({ result: pythonOutput });
-      });
-    } catch (err) {
-      res.status(500).json(err);
-    }
-  });
 
 module.exports = router;
