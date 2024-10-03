@@ -234,6 +234,7 @@ router.get('/:battleId/process', async (req, res) => {
       // 勝者情報がある場合、バトル情報を更新し、Eloレートを更新
       if (result.winnerId) {
         battle.winnerId = result.winnerId;
+        console.log(`winnerId: ${battle.winnerId}`);
         battle.isFinished = true;
         await battle.save();
 
@@ -248,6 +249,20 @@ router.get('/:battleId/process', async (req, res) => {
         result.winnerProfilePicture = winner.profilePicture;
         result.loserProfilePicture = loser.profilePicture;
       }
+
+      if(result.pel == 1) {
+        const user = await User.findById(result.loserId);
+        console.log(`renaltyperson : ${user}`)
+        if(user.yellowcard){
+          user.redcard = true;
+        }
+        else{
+          user.yellowcard = true;
+        }
+        await user.save();
+      }
+
+      console.log(`battle of reason : ${result.reason}`)
 
       // 結果をフロントエンドに返す
       res.status(200).json(result);

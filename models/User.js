@@ -48,6 +48,15 @@ const UserSchema = new mongoose.Schema({
         type: String,
         max: 50,
     },
+
+    yellowcard: {
+        type: Boolean,
+        default: false,
+    },
+    redcard: {
+        type: Boolean,
+        default: false,
+    },
     eloRating: { type: Number, default: 1500 }, // Eloレーティングの初期値
 },
 {timestamps: true}

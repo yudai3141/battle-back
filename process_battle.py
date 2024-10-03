@@ -8,6 +8,11 @@ import os
 from dotenv import load_dotenv
 import json  # JSONを整形して出力するためにインポート
 import re
+import os
+import base64
+from PIL import Image
+import io
+from openai import AzureOpenAI
 
 def main():
     # 標準入力からデータを受け取る
@@ -36,13 +41,16 @@ def main():
         Pimg = post['img']
         img_fl = 1
     
+    
+    
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
     serpapi_api_key = os.getenv("Serp_API_KEY")
+    url = os.getenv("REACT_APP_PUBLIC_FOLDER")
     
     chat = ChatOpenAI(
     temperature=0,  # Reduce response randomness
-    model="gpt-3.5-turbo",
+    model="gpt-4",
     openai_api_key=openai_api_key
     )
     
@@ -57,6 +65,83 @@ def main():
     tools=tools,
     model=chat,
     )
+    
+    client = AzureOpenAI(
+    azure_endpoint = "https://e-zuka.openai.azure.com/", # 生成したリソースのエンドポイントです
+    api_version = "2023-12-01-preview", # https://learn.microsoft.com/en-us/azure/ai-services/openai/reference を参照してバージョンを指定
+    api_key = "ca8f471c510a4bf3ac870daaf80f467f" # 生成したリソースのキーです
+    )
+    
+    def create_image_data(image_path):
+        """
+        画像をBase64エンコードし、APIリクエスト用のデータを作成します。
+
+        Args:
+            image_path (str): 画像ファイルのパス
+
+        Returns:
+            dict: 画像データの辞書
+        """
+        public_dir = "./public/images"
+        full_path = os.path.join(public_dir, image_path)
+
+        try:
+            with Image.open(full_path) as img:
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='JPEG')
+                base64_string = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+                return {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_string}",
+                        "detail": "high"
+                    }
+                }
+                
+        except OSError as e:
+            print(f"画像の読み込みに失敗しました: {image_path}, {e}")
+            return None
+
+    def get_image_analysis(client, image_files, prompt):
+        """
+        Azure OpenAI APIを使用して、画像を分析します。
+
+        Args:
+            client (AzureOpenAI): Azure OpenAIのクライアント
+            image_files (list): 画像データのリスト
+            prompt (str): 分析に関するプロンプト
+
+        Returns:
+            str: 分析結果
+        """
+
+        request_messages = {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": prompt
+                }
+            ] + image_files
+        }
+
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[request_messages],
+            max_tokens=1000
+        )
+        return response.choices[0].message.content
+
+
+    if img_fl == 1:
+        image_files = []
+        image_data = create_image_data(Pimg)
+        if image_data:
+            image_files.append(image_data)
+            prompt = "画像について詳細に説明してください"
+            img_tx = get_image_analysis(client, image_files, prompt)
+    
+    
     def serialize_message_object(obj):
         if isinstance(obj, (HumanMessage, AIMessage, ToolMessage)):
             return {
@@ -80,14 +165,14 @@ def main():
                     HumanMessage(content=f"""
                     以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、
                     勝者を決定し、以下のフォーマットで出力してください。必要に応じてGoogle検索を使用してください。
-                    会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにしてください。
+                    会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにし、回答フォーマットの'penalty'の欄を1としてください
                     
                     回答フォーマット
-                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述)
+                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述),penalty: (1or0,誹謗中傷を行った者がいた場合1を立てる。デフォルトは0)
                     
                     また会話は以下のように記述します.
                     (例)
-                    会話: (user1id): (user1の発言).(user2id): (user2の発言).(user1id): (user1の発言).(user2id): (user2の発言).(user1id): (user1の発言) 
+                    会話: (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言) 
                     
                     ポスト: {Pdesc}
                     会話:{conversation}
@@ -103,13 +188,13 @@ def main():
                     会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにしてください。
                     
                     回答フォーマット
-                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述)
+                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述),penalty: (1or0,誹謗中傷を行った者がいた場合1を立てる。デフォルトは0)
                     
                     また会話は以下のように記述します.
                     (例)
-                    会話: (user1id): (user1の発言).(user2id): (user2の発言).(user1id): (user1の発言).(user2id): (user2の発言).(user1id): (user1の発言) 
+                    会話: (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言) 
                     
-                    ポスト:(image) {Pimg}
+                    ポスト:(image) {img_tx}
                     
                     会話:{conversation}
                     """)
@@ -124,13 +209,13 @@ def main():
                     会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにしてください。
                     
                     回答フォーマット
-                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述)
+                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述),penalty: (1or0,誹謗中傷を行った者がいた場合1を立てる。デフォルトは0)
                     
                     また会話は以下のように記述します.
                     (例)
-                    会話: (user1id): (user1の発言).(user2id): (user2の発言).(user1id): (user1の発言).(user2id): (user2の発言).(user1id): (user1の発言) 
+                    会話: (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言) 
                     
-                    ポスト:(image) {Pimg}, (text) {Pdesc}
+                    ポスト:(image) {img_tx}, (text) {Pdesc}
                     
                     会話:{conversation}
                     """)
@@ -153,7 +238,7 @@ def main():
     for round_info in rounds:
         speaker = round_info['speakerId']
         content = round_info['content']
-        conver = f"{speaker}: {content}."
+        conver = f"{speaker}:{content}. "
         conver_arr.append(conver)
     
     for arr in conver_arr:
@@ -162,17 +247,19 @@ def main():
     # Analyze the conversation and determine the winner
     winner = analyze_conversation(conversation)
     # 正規表現パターン
-    pattern = r"WinnerID: (\w+), reason: (.+)"
+    pattern = r"WinnerID: (\w+), reason: (.+), penalty: (0|1)"
 
     # 正規表現でマッチング
     match = re.search(pattern, winner)
     
     userid = ""
     reason = ""
+    penalty = 0 
 
     if match:
         userid = match.group(1)
         reason = match.group(2)
+        penalty = int(match.group(3))
     # else:
     #     print("マッチするパターンが見つかりませんでした")
         
@@ -190,12 +277,14 @@ def main():
     else:
         winner = opponent
         loser = initiator
+        
     result = {
         'winnerId': winner['_id'],
         'winnerUsername': winner['username'],
         'loserId': loser['_id'],
         'loserUsername': loser['username'],
-        'reason': reason
+        'reason': reason,
+        'pel': penalty #違反が合ったかどうか
     }
 
     # 結果をJSONとして出力
