@@ -9,6 +9,7 @@ const BattleSchema = new mongoose.Schema({
   rounds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DebateRound' }], // ラウンドの参照
   currentRound: { type: Number, default: 1 },
   isFinished: { type: Boolean, default: false },
+  isresult: { type: Boolean, default: false },
   winnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   surrendered: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
