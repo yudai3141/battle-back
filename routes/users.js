@@ -95,6 +95,17 @@ router.put("/:id/follow", async(req, res) => {
     }
 })
 
+
+router.get('/rate-ranking', async (req, res) => {
+    try {
+      // ユーザーをレート順にソートして取得
+      const users = await User.find().sort({ eloRating: -1 }).limit(5); // 上位10名を取得
+      return res.status(200).json(users);
+    } catch (err) {
+      return res.status(500).json(err);
+    }
+  });
+
 // ユーザーのフォローを外す
 router.put("/:id/unfollow", async(req, res) => {
     if (req.body.userId !== req.params.id) {

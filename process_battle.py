@@ -27,18 +27,19 @@ def main():
     initiator = battle['initiatorId']
     opponent = battle['opponentId']
     cur_node = post['parentPostId']
+    start_1 = post
     while cur_node:#ポストに大元が入る
         post = cur_node
         cur_node = post['parentPostId']
         
     img_fl = 0
     desc_fl = 0
-    if post.get('desc'):
-        Pdesc = post['desc']
+    if start_1.get('desc'):
+        Pdesc = start_1['desc']
         desc_fl = 1
 
-    if post.get('img'):
-        Pimg = post['img']
+    if start_1.get('img'):
+        Pimg = start_1['img']
         img_fl = 1
     
     
@@ -126,7 +127,7 @@ def main():
         }
 
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[request_messages],
             max_tokens=1000
         )
@@ -163,19 +164,29 @@ def main():
             result = agent.invoke({
                 "messages": [
                     HumanMessage(content=f"""
-                    以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、
-                    勝者を決定し、以下のフォーマットで出力してください。必要に応じてGoogle検索を使用してください。
-                    会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにし、回答フォーマットの'penalty'の欄を1としてください
+                    以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、勝者を決定してください。必要に応じて**serpapi**を用いたGoogle検索を使用して情報を収集してください。
                     
-                    回答フォーマット
-                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述),penalty: (1or0,誹謗中傷を行った者がいた場合1を立てる。デフォルトは0)
+                    **特記事項**:
+                    - 会話内に明らかに他者に対する誹謗中傷が含まれている場合、その発言を行ったユーザーを自動的に敗者とします。
+                    - 必ず勝者を決定してください。
+                    - **ポストの内容は user2 の発言として扱い、解析・判定に考慮してください。**
+                    - 出力は必ず以下のフォーマットに従ってください。このフォーマット以外の出力は行わないでください。
                     
-                    また会話は以下のように記述します.
-                    (例)
-                    会話: (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言) 
+                    **会話の記述方法**:
+                    (user1情報):(user1の発言). (user2情報):(user2発言). (user1情報):(user1の発言). (user2情報):(user2の発言). (user1の情報):(user1の発言).
                     
-                    ポスト: {Pdesc}
-                    会話:{conversation}
+                    **ポスト**:
+                    {Pdesc}
+                    ※ ポストは user2 の発言とみなされます。
+                    
+                    **会話**:
+                    {conversation}
+                    
+                    **出力フォーマット**:
+                    勝者: (ID), 理由: (勝敗の理由を記載), 反則:(0or1or2, 誹謗中傷を行ったものがいた場合1を立てる。両者誹謗中傷を行った場合2を立てる。デフォルトは0)
+                    
+                    **例**:
+                    勝者: 66f968dd42a67231aeab721d, 理由: yuの主張は現実的であり、今すぐに対応が必要な問題に対して即効性のある解決策を支持している。一方で、aoの提案する根本的な問題解決は重要だが、それが実現するまでの間に必要な安全策（女性専用車両）を無視することは、現状でリスクが大きいと考えられる。また、監視カメラ案の実効性や即効性に対する限界が明確に指摘されたため、yuの最終反論がより強力であると判断される。, 反則: 0
                     """)
                 ]
             })
@@ -183,20 +194,29 @@ def main():
             result = agent.invoke({
                 "messages": [
                     HumanMessage(content=f"""
-                    以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、
-                    勝者を決定し、以下のフォーマットで出力してください。必要に応じてGoogle検索を使用してください。
-                    会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにしてください。
+                    以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、勝者を決定してください。必要に応じて**serpapi**を用いたGoogle検索を使用して情報を収集してください。
                     
-                    回答フォーマット
-                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述),penalty: (1or0,誹謗中傷を行った者がいた場合1を立てる。デフォルトは0)
+                    **特記事項**:
+                    - 会話内に明らかに他者に対する誹謗中傷が含まれている場合、その発言を行ったユーザーを自動的に敗者とします。
+                    - 必ず勝者を決定してください。
+                    - **ポストの内容は user2 の発言として扱い、解析・判定に考慮してください。**
+                    - 出力は必ず以下のフォーマットに従ってください。このフォーマット以外の出力は行わないでください。
                     
-                    また会話は以下のように記述します.
-                    (例)
-                    会話: (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言) 
+                    **会話の記述方法**:
+                    (user1情報):(user1の発言). (user2情報):(user2発言). (user1情報):(user1の発言). (user2情報):(user2の発言). (user1の情報):(user1の発言).
                     
-                    ポスト:(image) {img_tx}
+                    **ポスト**:
+                    -画像: {img_tx}
+                    ※ ポストは user2 の発言とみなされます。
                     
-                    会話:{conversation}
+                    **会話**:
+                    {conversation}
+                    
+                    **出力フォーマット**:
+                    勝者: (ID), 理由: (勝敗の理由を記載), 反則:(0or1or2, 誹謗中傷を行ったものがいた場合1を立てる。両者誹謗中傷を行った場合2を立てる。デフォルトは0)
+                    
+                    **例**:
+                        勝者: 66f968dd42a67231aeab721d, 理由: yuの主張は現実的であり、今すぐに対応が必要な問題に対して即効性のある解決策を支持している。一方で、aoの提案する根本的な問題解決は重要だが、それが実現するまでの間に必要な安全策（女性専用車両）を無視することは、現状でリスクが大きいと考えられる。また、監視カメラ案の実効性や即効性に対する限界が明確に指摘されたため、yuの最終反論がより強力であると判断される。, 反則: 0
                     """)
                 ]
             })
@@ -204,20 +224,30 @@ def main():
             result = agent.invoke({
                 "messages": [
                     HumanMessage(content=f"""
-                    以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、
-                    勝者を決定し、以下のフォーマットで出力してください。必要に応じてGoogle検索を使用してください。
-                    会話内に明らかに他者に対しての誹謗中傷が含まれている場合その時点で誹謗中傷を行った人を負けにしてください。
+                    以下のポストとそれに関する会話の内容を解析し、それぞれの主張に対して客観的な情報を用いてその正当性を確かめ、勝者を決定してください。必要に応じて**serpapi**を用いたGoogle検索を使用して情報を収集してください。
                     
-                    回答フォーマット
-                    WinnerID: (ID), reason: (勝敗の理由を会話に使われている言語と同じもので記述),penalty: (1or0,誹謗中傷を行った者がいた場合1を立てる。デフォルトは0)
+                    **特記事項**:
+                    - 会話内に明らかに他者に対する誹謗中傷が含まれている場合、その発言を行ったユーザーを自動的に敗者とします。
+                    - 必ず勝者を決定してください。
+                    - **ポストの内容は user2 の発言として扱い、解析・判定に考慮してください。**
+                    - 出力は必ず以下のフォーマットに従ってください。このフォーマット以外の出力は行わないでください。
                     
-                    また会話は以下のように記述します.
-                    (例)
-                    会話: (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言). (user2id):(user2の発言). (user1id):(user1の発言) 
+                    **会話の記述方法**:
+                    (user1情報):(user1の発言). (user2情報):(user2発言). (user1情報):(user1の発言). (user2情報):(user2の発言). (user1の情報):(user1の発言).
                     
-                    ポスト:(image) {img_tx}, (text) {Pdesc}
+                    **ポスト**:
+                    - テキスト:{Pdesc}
+                    _ 画像: {img_tx}
+                    ※ ポストは user2 の発言とみなされます。
                     
-                    会話:{conversation}
+                    **会話**:
+                    {conversation}
+                    
+                    **出力フォーマット**:
+                    勝者: (ID), 理由: (勝敗の理由を記載), 反則:(0or1or2, 誹謗中傷を行ったものがいた場合1を立てる。両者誹謗中傷を行った場合2を立てる。デフォルトは0)
+                    
+                    **例**:
+                    勝者: 66f968dd42a67231aeab721d, 理由: yuの主張は現実的であり、今すぐに対応が必要な問題に対して即効性のある解決策を支持している。一方で、aoの提案する根本的な問題解決は重要だが、それが実現するまでの間に必要な安全策（女性専用車両）を無視することは、現状でリスクが大きいと考えられる。また、監視カメラ案の実効性や即効性に対する限界が明確に指摘されたため、yuの最終反論がより強力であると判断される。, 反則: 0
                     """)
                 ]
             })
@@ -237,40 +267,30 @@ def main():
     
     for round_info in rounds:
         speaker = round_info['speakerId']
+        speak = speaker['_id']
         content = round_info['content']
         conver = f"{speaker}:{content}. "
         conver_arr.append(conver)
     
     for arr in conver_arr:
         conversation = conversation + arr
+        # print(f"python : {conversation}")
         
     # Analyze the conversation and determine the winner
     winner = analyze_conversation(conversation)
-    # 正規表現パターン
-    pattern = r"WinnerID: (\w+), reason: (.+), penalty: (0|1)"
-
-    # 正規表現でマッチング
-    match = re.search(pattern, winner)
     
-    userid = ""
-    reason = ""
-    penalty = 0 
+    # 正規表現パターンを定義
+    pattern = r'勝者:\s*([^\s,]+),\s*理由:\s*([^,]+),\s*反則:\s*(\d+)'
+
+    # 正規表現を使ってマッチする部分を抽出
+    match = re.search(pattern, winner)
 
     if match:
         userid = match.group(1)
         reason = match.group(2)
-        penalty = int(match.group(3))
-    # else:
-    #     print("マッチするパターンが見つかりませんでした")
+        foul = match.group(3)
+            
         
-    # 結果データを作成
-    # result = {
-    #     'winnerId': winner['_id'] if winner else None,
-    #     'winnerUsername': winner['username'] if winner else None,
-    #     'loserId': loser['_id'] if loser else None,
-    #     'loserUsername': loser['username'] if loser else None,
-    #     'reason': reason
-    # }
     if userid == initiator['_id']:#レスバトル開始者が勝者
         winner = initiator
         loser = opponent
@@ -284,8 +304,14 @@ def main():
         'loserId': loser['_id'],
         'loserUsername': loser['username'],
         'reason': reason,
-        'pel': penalty #違反が合ったかどうか
+        'pel': foul, #違反が合ったかどうか
+        'parent_post' : post,
+        'parent_post_key' : post['_id'],
+        'start_post' : start_1,
+        'start_post_key' : start_1['_id'],
     }
+    
+    # print(f"python : {result}")
 
     # 結果をJSONとして出力
     print(json.dumps(result))
