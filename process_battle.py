@@ -13,6 +13,8 @@ import base64
 from PIL import Image
 import io
 from openai import AzureOpenAI
+import http.client
+import uuid
 
 def main():
     # 標準入力からデータを受け取る
@@ -155,6 +157,34 @@ def main():
         elif isinstance(obj, list):
             return [serialize_message_object(i) for i in obj]
         return obj
+    
+    def check_ai_generated(text):
+        conn = http.client.HTTPSConnection("api.copyleaks.com")
+
+        # スキャンIDとテキストを指定
+        payload = json.dumps({
+            "text": text,
+            "language": "ja"  # 日本語で解析することを指定
+        })
+
+        headers = {
+            'Authorization': "Bearer 20FB77D32A196F35CE85599B7B930DBBEECAC86ED14F29C33B5CB9EC6F53B059", #有効期限あり
+            'Content-Type': "application/json",
+            'Accept': "application/json"
+        }
+
+        # スキャンIDを指定し、リクエストを送信
+        scan_id = str(uuid.uuid4())
+        conn.request("POST", f"/v2/writer-detector/{scan_id}/check", payload.encode('utf-8'), headers)
+
+        res = conn.getresponse()
+        data = res.read()
+        result = json.loads(data.decode("utf-8"))
+        if 'summary' in result:
+            ai_probability = result['summary']['ai']
+            return ai_probability
+        else:
+            return None
 
     def analyze_conversation(conversation):
         # print("Starting conversation analysis...")
@@ -262,41 +292,97 @@ def main():
         # print(f"Winner determined:\n{winner_info}")
         return winner_info
 
-    conver_arr = []
-    conversation = " "
-    
+
+    # ユーザーの発言をまとめる
+    user1_text = ""
+    user2_text = ""
+
     for round_info in rounds:
         speaker = round_info['speakerId']
-        speak = speaker['_id']
         content = round_info['content']
-        conver = f"{speaker}:{content}. "
-        conver_arr.append(conver)
-    
-    for arr in conver_arr:
-        conversation = conversation + arr
-        # print(f"python : {conversation}")
-        
-    # Analyze the conversation and determine the winner
-    winner = analyze_conversation(conversation)
-    
-    # 正規表現パターンを定義
-    pattern = r'勝者:\s*([^\s,]+),\s*理由:\s*([^,]+),\s*反則:\s*(\d+)'
+        if speaker['_id'] == initiator['_id']:
+            user1_text += content + " "
+        elif speaker['_id'] == opponent['_id']:
+            user2_text += content + " "
 
-    # 正規表現を使ってマッチする部分を抽出
-    match = re.search(pattern, winner)
+    # ポストの内容をuser2の発言として追加
+    if desc_fl == 1:
+        user2_text += Pdesc + " "
 
-    if match:
-        userid = match.group(1)
-        reason = match.group(2)
-        foul = match.group(3)
-            
-        
-    if userid == initiator['_id']:#レスバトル開始者が勝者
-        winner = initiator
-        loser = opponent
-    else:
+    # AI生成確率をチェック
+    user1_ai_prob = check_ai_generated(user1_text)
+    user2_ai_prob = check_ai_generated(user2_text)
+
+    # 必要に応じて反則を適用
+    # foul = 0
+    # winner = None
+    # loser = None
+    # reason = ""
+
+    # ユーザー1のAI生成確率を判定
+    if (user1_ai_prob is not None and user1_ai_prob > 0.9):
         winner = opponent
         loser = initiator
+        foul = 1
+        reason = f"{loser['username']}の発言がAIによって生成されたと判定されたため、{winner['username']}の勝利です。"
+
+    # ユーザー2のAI生成確率を判定
+    elif (user2_ai_prob is not None and user2_ai_prob > 0.9):
+        winner = initiator
+        loser = opponent
+        foul = 1
+        reason = f"{loser['username']}の発言がAIによって生成されたと判定されたため、{winner['username']}の勝利です。"
+
+    # ユーザー1のAI生成確率がNoneで、ユーザー2が0.9以上の場合
+    elif (user1_ai_prob is None and user2_ai_prob is not None and user2_ai_prob > 0.9):
+        winner = initiator
+        loser = opponent
+        foul = 1
+        reason = f"{loser['username']}の発言がAIによって生成された可能性があるため、{winner['username']}の勝利です。"
+
+    # ユーザー2のAI生成確率がNoneで、ユーザー1が0.9以上の場合
+    elif (user2_ai_prob is None and user1_ai_prob is not None and user1_ai_prob > 0.9):
+        winner = opponent
+        loser = initiator
+        foul = 1
+        reason = f"{loser['username']}の発言がAIによって生成された可能性があるため、{winner['username']}の勝利です。"
+        
+    else:
+        conver_arr = []
+        conversation = " "
+        
+        for round_info in rounds:
+            speaker = round_info['speakerId']
+            speak = speaker['_id']
+            content = round_info['content']
+            conver = f"{speaker}:{content}. "
+            conver_arr.append(conver)
+        
+        for arr in conver_arr:
+            conversation = conversation + arr
+            # print(f"python : {conversation}")
+            
+        # Analyze the conversation and determine the winner
+        winner = analyze_conversation(conversation)
+        
+        # 正規表現パターンを定義
+        pattern = r'勝者:\s*([^\s,]+),\s*理由:\s*([^,]+),\s*反則:\s*(\d+)'
+
+        # 正規表現を使ってマッチする部分を抽出
+        match = re.search(pattern, winner)
+
+        if match:
+            userid = match.group(1)
+            reason = match.group(2)
+            foul = match.group(3)
+                
+            
+        if userid == initiator['_id']:#レスバトル開始者が勝者
+            winner = initiator
+            loser = opponent
+        else:
+            winner = opponent
+            loser = initiator
         
     result = {
         'winnerId': winner['_id'],
